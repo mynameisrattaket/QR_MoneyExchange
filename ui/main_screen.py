@@ -1,99 +1,207 @@
-from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpinBox, QDialog, QDialogButtonBox
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QStackedWidget, QSizePolicy, QSpacerItem
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap
+import qrcode
 
 class MainScreen(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("QR Money Exchange")  # ตั้งชื่อหน้าต่าง
-        self.setGeometry(100, 100, 600, 400)  # ตั้งขนาดหน้าต่าง
+        self.setWindowTitle("QR Money Exchange")
+        self.setGeometry(100, 100, 600, 400)
 
-        # สร้าง Layout หลัก
-        self.main_layout = QVBoxLayout()
+        # ใช้ฟอนต์ปกติในระบบ
+        self.default_font = QFont("Segoe UI", 14)  # สำหรับ Windows
+        # หากใช้ Mac หรือ Linux สามารถเปลี่ยนชื่อฟอนต์ เช่น "System", "Ubuntu"
 
-        # สร้างส่วนของคำอธิบาย (Label)
-        self.title_label = QLabel("Welcome to QR Money Exchange", self)
-        self.title_label.setFont(QFont("Arial", 20, QFont.Bold))
-        self.title_label.setAlignment(Qt.AlignCenter)
+        # สร้าง StackedWidget สำหรับจัดการหน้า
+        self.pages = QStackedWidget(self)
+
+        # สร้างหน้าแรก
+        self.page1 = QWidget()
+        self.create_main_page()
+
+        # สร้างหน้าเลือกจำนวน
+        self.page2 = QWidget()
+        self.create_quantity_page()
+
+        # สร้างหน้าแสดง QR Code
+        self.page3 = QWidget()
+        self.create_qr_code_page()
+
+        # เพิ่มหน้าใน StackedWidget
+        self.pages.addWidget(self.page1)
+        self.pages.addWidget(self.page2)
+        self.pages.addWidget(self.page3)
+
+        # ตั้ง Layout หลัก
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.pages)
+        self.setLayout(layout)
+
+        # เก็บค่าเงินที่เลือกและจำนวน
+        self.selected_denomination = None
+        self.selected_quantity = 1
+
+    def create_main_page(self):
+        """สร้างหน้าแรก"""
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignCenter)
+
+        # คำอธิบาย
+        title_label = QLabel("QR Money Exchange", self)
+        title_label.setFont(QFont("Segoe UI", 20))
+        title_label.setAlignment(Qt.AlignCenter)
 
         # ปุ่มเลือกเงิน
-        self.denomination_button_10 = QPushButton("10 Baht", self)
-        self.denomination_button_20 = QPushButton("20 Baht", self)
-        self.denomination_button_100 = QPushButton("100 Baht", self)
+        denomination_buttons = [
+            self.create_button("10 บาท", lambda: self.go_to_quantity_page("10")),
+            self.create_button("20 บาท", lambda: self.go_to_quantity_page("20")),
+            self.create_button("100 บาท", lambda: self.go_to_quantity_page("100")),
+        ]
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(20)  # เพิ่มระยะห่างระหว่างปุ่ม
+        for btn in denomination_buttons:
+            button_layout.addWidget(btn)
 
-        # การตั้งค่าปุ่ม
-        self.denomination_button_10.setFixedSize(150, 50)
-        self.denomination_button_20.setFixedSize(150, 50)
-        self.denomination_button_100.setFixedSize(150, 50)
+        # เพิ่ม widget ใน Layout
+        layout.addWidget(title_label)
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))  # เพิ่มระยะด้านบน
+        layout.addLayout(button_layout)
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))  # เพิ่มระยะด้านล่าง
+        self.page1.setLayout(layout)
 
-        # เพิ่มปุ่มเข้า Layout
-        self.button_layout = QHBoxLayout()
-        self.button_layout.addWidget(self.denomination_button_10)
-        self.button_layout.addWidget(self.denomination_button_20)
-        self.button_layout.addWidget(self.denomination_button_100)
+    def create_quantity_page(self):
+        """สร้างหน้าเลือกจำนวน"""
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignCenter)
 
-        # เพิ่ม label และ layout ของปุ่มลงใน layout หลัก
-        self.main_layout.addWidget(self.title_label)
-        self.main_layout.addLayout(self.button_layout)
+        # คำอธิบาย
+        title_label = QLabel("เลือกจำนวนที่ต้องการ", self)
+        title_label.setFont(QFont("Segoe UI", 20))
+        title_label.setAlignment(Qt.AlignCenter)
 
-        # เพิ่มปุ่ม "ถัดไป" สำหรับไปหน้าเลือกจำนวน
-        self.next_button = QPushButton("Next", self)
-        self.next_button.setFixedSize(150, 50)
-        self.main_layout.addWidget(self.next_button, alignment=Qt.AlignCenter)
+        # Layout สำหรับปุ่มเพิ่ม/ลดจำนวน
+        quantity_layout = QHBoxLayout()
+        self.quantity_label = QLabel("1", self)
+        self.quantity_label.setFont(QFont("Segoe UI", 16))
+        self.quantity_label.setAlignment(Qt.AlignCenter)
+        self.quantity_label.setFixedSize(80, 50)
 
-        # ตั้งค่าของหน้าต่าง
-        self.setLayout(self.main_layout)
+        decrease_button = self.create_button("-", self.decrease_quantity, button_size=(50, 50))
+        increase_button = self.create_button("+", self.increase_quantity, button_size=(50, 50))
 
-        # เชื่อมโยงปุ่มกับฟังก์ชัน
-        self.denomination_button_10.clicked.connect(self.select_10_baht)
-        self.denomination_button_20.clicked.connect(self.select_20_baht)
-        self.denomination_button_100.clicked.connect(self.select_100_baht)
-        self.next_button.clicked.connect(self.open_quantity_dialog)
+        quantity_layout.addWidget(decrease_button)
+        quantity_layout.addWidget(self.quantity_label)
+        quantity_layout.addWidget(increase_button)
 
-    def select_10_baht(self):
-        print("Selected 10 Baht")
+        # ปุ่มยืนยันและกลับ
+        action_layout = QHBoxLayout()
+        action_layout.setSpacing(20)  # เพิ่มระยะห่างระหว่างปุ่ม
+        back_button = self.create_button("ย้อนกลับ", self.go_to_main_page, button_size=(120, 50))
+        confirm_button = self.create_button("ยืนยัน", self.go_to_qr_code_page, button_size=(120, 50))
 
-    def select_20_baht(self):
-        print("Selected 20 Baht")
+        action_layout.addWidget(back_button)
+        action_layout.addWidget(confirm_button)
 
-    def select_100_baht(self):
-        print("Selected 100 Baht")
+        # เพิ่ม widget ใน Layout
+        layout.addWidget(title_label)
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))  # ระยะด้านบน
+        layout.addLayout(quantity_layout)
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))  # ระยะด้านล่าง
+        layout.addLayout(action_layout)
+        self.page2.setLayout(layout)
 
-    def open_quantity_dialog(self):
-        """ฟังก์ชันเปิดหน้าต่างเลือกจำนวน"""
-        dialog = QuantityDialog(self)
-        dialog.exec_()
+    def create_qr_code_page(self):
+        """สร้างหน้าแสดง QR Code"""
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignCenter)
 
-class QuantityDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+        # คำอธิบาย
+        title_label = QLabel("สเเกน QR Code เพื่อจ่ายเงิน", self)
+        title_label.setFont(QFont("Segoe UI", 20))
+        title_label.setAlignment(Qt.AlignCenter)
 
-        self.setWindowTitle("Select Quantity")
-        self.setGeometry(200, 200, 300, 150)
+        # Placeholder สำหรับ QR Code
+        self.qr_code_label = QLabel(self)
+        self.qr_code_label.setAlignment(Qt.AlignCenter)
 
-        self.quantity_label = QLabel("Select Quantity:", self)
-        self.quantity_label.setFont(QFont("Arial", 14))
-        self.quantity_label.move(20, 20)
+        # เพิ่ม label สำหรับแสดงจำนวนเงินที่ต้องจ่าย
+        self.payment_info_label = QLabel(self)
+        self.payment_info_label.setFont(QFont("Segoe UI", 16))
+        self.payment_info_label.setAlignment(Qt.AlignCenter)
 
-        self.quantity_spinbox = QSpinBox(self)
-        self.quantity_spinbox.setMinimum(1)
-        self.quantity_spinbox.setMaximum(100)
-        self.quantity_spinbox.setValue(1)
-        self.quantity_spinbox.move(150, 20)
+        # ปุ่มกลับไปหน้าแรก
+        back_button = self.create_button("กลับไปยังหน้าแรก", self.go_to_main_page, button_size=(200, 50))
 
-        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, self)
-        self.buttons.move(90, 80)
-        self.buttons.accepted.connect(self.accept)
-        self.buttons.rejected.connect(self.reject)
+        # เพิ่ม widget ใน Layout
+        layout.addWidget(title_label)
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))  # ระยะด้านบน
+        layout.addWidget(self.qr_code_label)  # แสดง QR Code
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))  # ระยะด้านล่าง
+        layout.addWidget(self.payment_info_label)  # แสดงจำนวนเงินที่ต้องจ่าย
+        layout.addSpacerItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))  # ระยะด้านล่าง
+        layout.addWidget(back_button)
+        self.page3.setLayout(layout)
 
-    def get_quantity(self):
-        return self.quantity_spinbox.value()
 
-# ในกรณีที่ต้องการเรียกใช้ main
+    def create_button(self, text, callback, button_size=(135, 60)):
+        """สร้างปุ่มพร้อมฟังก์ชัน callback"""
+        button = QPushButton(text, self)
+        button.setFont(self.default_font)
+        button.setFixedSize(*button_size)  # ขนาดปุ่ม
+        button.clicked.connect(callback)
+        return button
+
+    def go_to_quantity_page(self, denomination):
+        """ไปยังหน้าเลือกจำนวน"""
+        self.selected_denomination = denomination
+        self.selected_quantity = 1
+        self.quantity_label.setText(str(self.selected_quantity))
+        self.pages.setCurrentWidget(self.page2)
+
+    def go_to_qr_code_page(self):
+        """ไปยังหน้าแสดง QR Code"""
+        total_amount = int(self.selected_denomination) * self.selected_quantity
+
+        # สร้างข้อความแสดงจำนวนเงินที่ต้องจ่าย
+        payment_info = f"จำนวนทั้งหมด: {total_amount} บาท"
+        self.payment_info_label.setText(payment_info)  # ตั้งค่าข้อความใหม่
+
+        # สร้าง QR Code
+        qr = qrcode.QRCode()
+        qr.add_data(f"Pay {total_amount} Baht")
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        # แปลงภาพ QR Code ให้ใช้ใน QLabel
+        img_path = "assets/images/qr_code.png"
+        img.save(img_path)
+        pixmap = QPixmap(img_path)
+        self.qr_code_label.setPixmap(pixmap)
+
+        self.pages.setCurrentWidget(self.page3)
+
+
+    def decrease_quantity(self):
+        """ลดจำนวน"""
+        if self.selected_quantity > 1:
+            self.selected_quantity -= 1
+            self.quantity_label.setText(str(self.selected_quantity))
+
+    def increase_quantity(self):
+        """เพิ่มจำนวน"""
+        self.selected_quantity += 1
+        self.quantity_label.setText(str(self.selected_quantity))
+
+    def go_to_main_page(self):
+        """กลับไปยังหน้าแรก"""
+        self.pages.setCurrentWidget(self.page1)
+
+
 if __name__ == "__main__":
-    from PyQt5.QtWidgets import QApplication
-    app = QApplication([])
+    import sys
+    app = QApplication(sys.argv)
     window = MainScreen()
     window.show()
-    app.exec_()
+    sys.exit(app.exec_())
